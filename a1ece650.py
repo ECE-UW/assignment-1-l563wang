@@ -35,27 +35,72 @@ def line_intersection(line1, line2):
     :param line2: [(x1,y2),(x1,y2)]
     :return: the intersection point coordinate(x,y) if there is an intersection, else return 0
     """
-
+    inserarray = set([])
     if line1 == [] or line2 == []:
         return 0
     xdiff = (float(line1[0][0] - line1[1][0]),float(line2[0][0] - line2[1][0]))
     ydiff = (float(line1[0][1] - line1[1][1]), float(line2[0][1] - line2[1][1]))
+    d1 = float(line1[0][0]-line2[0][0])
+    d2 = float(line1[0][1]-line2[0][1])
 
+    common_line = d1*ydiff[1]-d2*xdiff[1]
     def det(a, b):
         return a[0] * b[1] - a[1] * b[0]
 
     div = det(xdiff, ydiff)
     if div == 0:
-        return 0
+        if common_line != 0:
+            return 0
+        else:
+            xmin_1 = min(line1[0][0],line1[1][0])
+            xmax_1 = max(line1[0][0],line1[1][0])
+            xmin_2 = min(line2[0][0],line2[1][0])
+            xmax_2 = max(line2[0][0],line2[1][0])
 
+            if xmax_1 < xmin_2 or xmax_2 < xmin_1:
+                return 0
+            elif xmin_2 == xmin_1 and xmax_1 == xmax_2:
+                return 0
+            elif xmin_2 <= xmax_1 and xmax_1 <= xmax_2:
+                if xmin_2 <= xmin_1:
+                    inserarray.add((line1[0][0],line1[0][1]))
+                    inserarray.add((line1[1][0],line1[1][1]))
+                    return list(inserarray)
+                else:
+                    if xmin_2 == line2[0][0]:
+                        inserarray.add((line2[0][0],line2[0][1]))
+                    else:
+                        inserarray.add((line2[1][0],line2[1][1]))
+                    if xmax_1 == line1[0][0]:
+                        inserarray.add((line1[0][0],line1[0][1]))
+                    else:
+                        inserarray.add((line1[1][0],line1[1][1]))
+                    return list(inserarray)
+            elif xmax_2 < xmax_1:
+                if xmin_2 <= xmin_1 and xmin_1 <= xmax_2:
+                    if xmin_1 == line1[0][0]:
+                        inserarray.add((line1[0][0],line1[0][1]))
+                    else:
+                        inserarray.add((line1[1][0],line1[1][1]))
+                    if xmax_2 == line2[0][0]:
+                        inserarray.add((line2[0][0],line2[0][1]))
+                    else:
+                        inserarray.add((line2[1][0],line2[1][1]))
+                    return list(inserarray)
+                elif xmin_1 < xmin_2:
+                    inserarray.add((line2[0][0],line2[0][1]))
+                    inserarray.add((line2[1][0],line2[1][1]))
+                    return list(inserarray)
 
-    d = (det(*line1), det(*line2))
-    x = det(d, xdiff) / div
-    y = det(d, ydiff) / div
-    if PointOnSeg((x,y),line1) and PointOnSeg((x,y),line2):
-        return x,y
     else:
-        return 0
+        d = (det(*line1), det(*line2))
+        x = det(d, xdiff) / div
+        y = det(d, ydiff) / div
+        if PointOnSeg((x,y),line1) and PointOnSeg((x,y),line2):
+            inserarray.add((x,y))
+            return list(inserarray)
+        else:
+            return 0
 
 
 def PointOnSeg((x,y), line):
@@ -116,10 +161,10 @@ def generate_graph(estreet={},oldV= {},Vcounter = 0):
     ev = {}# the dictionary of V reverse,i.e {gps:vertex id}
     estreet_line = Create_line(estreet)
     old_line = []
-    ev_reverse={} # the dictionary of V,i.e {vertex_id,gps}
+    ev_reverse={} # the dictionary of V,i.e {vertex_id:gps}
     ev_reverse_f = {} #format all float
     vpoint = set([])
-
+    new_po_array = []
     for each_street in estreet_line:
         old_line.append(each_street)
         new_line = list(set(estreet_line) - set(old_line))
@@ -129,7 +174,7 @@ def generate_graph(estreet={},oldV= {},Vcounter = 0):
                     for each_seg_new in estreet_line[each_new_street]:
                         intersection = line_intersection(each_seg, each_seg_new)
                         if intersection:
-                            for new_v in [each_seg[0],each_seg[1],each_seg_new[0],each_seg_new[1],intersection]:
+                            for new_v in [each_seg[0],each_seg[1],each_seg_new[0],each_seg_new[1]]+intersection:
                                 if not new_v in ev:
                                     if new_v in oldV:
                                         ev[new_v] = oldV[new_v]
@@ -139,9 +184,10 @@ def generate_graph(estreet={},oldV= {},Vcounter = 0):
                                         ev_reverse[Vcounter] = new_v
                                         Vcounter = Vcounter + 1
                             for new_v_point in [each_seg[0],each_seg[1],each_seg_new[0],each_seg_new[1]]:
-                                if new_v_point != intersection:
-                                    ee.add((ev[new_v_point], ev[intersection]))
-                                    vpoint.add(new_v_point)
+                                if not new_v_point in intersection:
+                                    for each_intersection in intersection:
+                                        ee.add((ev[new_v_point],ev[each_intersection]))
+                                        vpoint.add(new_v_point)
 
     for each_vpoint in vpoint:
         vpoint_edge = set([])
@@ -173,7 +219,7 @@ def generate_graph(estreet={},oldV= {},Vcounter = 0):
             oldV[each_new_v] = ev[each_new_v]
 
     for each_rev in ev_reverse:
-        ev_reverse_f[each_rev] = tuple((pp(ev_reverse[each_rev][0]), pp(ev_reverse[each_rev][1])))
+        ev_reverse_f[each_rev] = tuple(('{0:.2f}'.format(ev_reverse[each_rev][0]),'{0:.2f}'.format(ev_reverse[each_rev][1])))
     return ev_reverse_f, ee, oldV
 
 
@@ -183,20 +229,16 @@ def output_E(edge = {}):
     :param edge: set of edge
     :return:
     """
-    e_lis = list(edge)
-    e_str = str(e_lis)
-    e_comma = re.sub(r',\s*(?![^()]*\))', ',\n', e_str)
-    e_left_bracket = re.sub(r'[(]', '<', e_comma)
-    e_right_bracket = re.sub(r'[)]', '>', e_left_bracket)
-    e_move_left = e_right_bracket.replace('[', '')
-    e_move_right = e_move_left.replace(']', '')
-    if e_move_right == '':
-        print "E = {"
-        print "}"
-    else:
-        print "E = {"
-        print e_move_right
-        print "}"
+    print "E = {"
+    for each_e in range(len(edge)):
+        e_left_bracket = re.sub(r'[(]', '<', str(list(edge)[each_e]))
+        e_right_bracket = re.sub(r'[)]', '>', e_left_bracket)
+        e_quo = re.sub("\s*", '', e_right_bracket)
+        if each_e == len(edge) - 1:
+            print "  {0}".format(e_quo)
+        else:
+            print "  {0},".format(e_quo)
+    print "}"
 
 
 def output_V(Vertex = {}):
@@ -205,29 +247,12 @@ def output_V(Vertex = {}):
     :param Vertex: vertex dictionary
     :return:
     """
-    v_str = str(Vertex)
-    v_comma = re.sub(r',\s*(?![^()]*\))', '\n', v_str)
-    v_bracket = v_comma.replace('{','')
-    v_r_bracket = v_bracket.replace('}','')
-    v_quotation_dele = v_r_bracket.replace("'",'')
-    if v_quotation_dele == '':
-        print "V = {"
-        print "}"
-    else:
-        print "V = {"
-        print v_quotation_dele
-        print "}"
-
-
-def pp(x):
-    if isinstance(x, float):
-        if x.is_integer():
-            return str(int(x))
-        else:
-            return '{0:.2f}'.format(x)
-    else:
-        return str(x)
-
+    print "V = {"
+    for each_v in Vertex:
+        v_quo = re.sub("'", '', str(Vertex[each_v]))
+        v_quo = re.sub("\s*", '', v_quo)
+        print "  {0}:  {1}".format(each_v, v_quo)
+    print "}"
 
 def main():
 
@@ -248,11 +273,14 @@ def main():
             if pattern_a.match(line):
                 gps_street = []
                 name_street = re.search(r'"(.*)"',line).group().lower()
-                gps_raw = re.findall(r'\(([0-9\-,]+)\)',line)
-                for i in gps_raw:
-                    gps_toast = eval(i)
-                    gps_street.append(gps_toast)
-                add_street(ori_street_dic,name_street,gps_street)
+                if name_street in ori_street_dic:
+                    print "Error: the street already exists!"
+                else:
+                    gps_raw = re.findall(r'\(([0-9\-,]+)\)',line)
+                    for i in gps_raw:
+                        gps_toast = eval(i)
+                        gps_street.append(gps_toast)
+                    add_street(ori_street_dic,name_street,gps_street)
             elif pattern_c.match(line):
                 name_street = re.search(r'"(.*)"', line).group().lower()
                 if name_street in ori_street_dic:
@@ -279,7 +307,6 @@ def main():
                 raise Exception("Error: Input is wrong!")
         except:
             print 'Error: Input is wrong!'
-    print 'Finished reading input'
 
     # return exit code 0 on successful termination
     sys.exit(0)
